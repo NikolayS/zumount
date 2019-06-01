@@ -2,8 +2,10 @@ package zumount
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -52,25 +54,21 @@ func UnmountAll(dataset string) error {
 	}
 	// while mounts remain, try to unmount some more
 	for len(mountsRemain) > 0 {
-		for ...
-		// ns (namespace) is a pid
-		ns, err := FindNamespaceToUnmount(dataset)
-		if err != nil {
-			return err
-		}
-		err = UnmountDatasetInNamespace(dataset, ns)
-		if err != nil {
-			log.Printf("failed unmounting %s in %s, but maybe made some progress, xontinuing... err: %s", dataset, ns, err)
-		}
-		mountsRemain, err = NamespacesForDataset(dataset)
-		if err != nil {
-			return err
+		for _, ns := range mountsRemain {
+			err = UnmountDatasetInNamespace(dataset, ns)
+			if err != nil {
+				log.Printf("failed unmounting %s in %s, but maybe made some progress, xontinuing... err: %s", dataset, ns, err)
+			}
+			mountsRemain, err = NamespacesForDataset(dataset)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func NamespacesForDataset(dataset string) ([]string, err) {
+func NamespacesForDataset(dataset string) ([]string, error) {
 
 	mountTables, err := filepath.Glob("/proc/*/mounts")
 	if err != nil {
@@ -86,15 +84,13 @@ func NamespacesForDataset(dataset string) ([]string, err) {
 			// pids can disappear between globbing and reading
 			log.Printf(
 				"[mount:%s] ignoring error reading pid mount table %v: %v",
-				fullId,
+				dataset,
 				mountTable, err,
 			)
 			continue
 		}
-		// return the first namespace found, as we'll unmount
-		// in there and then try again (recursively)
 		for _, line := range strings.Split(string(mounts), "\n") {
-			if strings.Contains(line, fullId) {
+			if strings.Contains(line, dataset) {
 				shrapnel := strings.Split(mountTable, "/")
 				// e.g. (0)/(1)proc/(2)X/(3)mounts
 				pids = append(pids, shrapnel[2])
@@ -112,4 +108,5 @@ func UnmountDatasetInNamespace(dataset, ns string) error {
 	if err != nil {
 		return fmt.Errorf("failed nsenter umount of %s in ns %s, err: %s, out: %s", dataset, ns, err, out)
 	}
+	return nil
 }
