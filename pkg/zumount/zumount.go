@@ -63,6 +63,9 @@ func UnmountAll(dataset string) error {
 			if err != nil {
 				return err
 			}
+			if len(mountsRemain) == 0 {
+				break
+			}
 		}
 	}
 	return nil

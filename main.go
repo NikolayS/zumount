@@ -1,17 +1,26 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"os"
 
 	"github.com/dotmesh-io/zumount/pkg/zumount"
 )
-import "fmt"
 
 // 0. run me in the host mount namespace
 // 1. for a given zfs pool (first arg)
 // 2. unmount all of the filesystems and snapshots for that zfs pool from all mount namespaces on the system
 
 func main() {
-	fmt.Println("Hello")
+	log.Print("Hello")
+	if len(os.Args) != 2 {
+		log.Printf("specify pool to unmount")
+		os.Exit(1)
+	}
+	err := zumount.Clean(os.Args[1])
+	if err != nil {
+		log.Printf("error cleaning: %s")
+		os.Exit(1)
+	}
 
 }
