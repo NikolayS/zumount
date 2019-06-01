@@ -52,6 +52,7 @@ func UnmountAll(dataset string) error {
 	}
 	// while mounts remain, try to unmount some more
 	for len(mountsRemain) > 0 {
+		for ...
 		// ns (namespace) is a pid
 		ns, err := FindNamespaceToUnmount(dataset)
 		if err != nil {
@@ -104,23 +105,11 @@ func NamespacesForDataset(dataset string) ([]string, err) {
 }
 
 func UnmountDatasetInNamespace(dataset, ns string) error {
-	// this is a misnomer as it's not actually a zfs command...
 	out, err := exec.Command(
-		"nsenter", "-t", firstPidNSToUnmount, "-m", "-u", "-n", "-i",
-		"umount", mountPath,
+		"nsenter", "-t", ns, "-a",
+		"umount", "--all-targets", dataset,
 	).CombinedOutput()
-	if rerr != nil {
-		return &types.Event{
-			Name: "failed-recovery-unmount",
-			Args: &types.EventArgs{
-				"original-err": err, "original-combined-output": string(out),
-				"recovery-err": rerr, "recovery-combined-output": string(rout),
-			},
-		}, backoffState
+	if err != nil {
+		return fmt.Errorf("failed nsenter umount of %s in ns %s, err: %s, out: %s", dataset, ns, err, out)
 	}
-	// recurse, maybe we've made enough progress to be able to
-	// mount this time?
-	//
-	// TODO limit recursion depth
-	return f.mountSnap(snapId, readonly)
 }
