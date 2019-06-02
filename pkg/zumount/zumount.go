@@ -55,7 +55,7 @@ func UnmountAll(dataset string) error {
 	var lastNS string
 	// while mounts remain, try to unmount some more
 	for nextNS != "" {
-		log.Printf("> unmounting %s from %s mount ns...", dataset, nextNS)
+		log.Printf("> unmounting %s from mount ns %s...", dataset, nextNS)
 		err = UnmountDatasetInNamespace(dataset, nextNS)
 		if err != nil {
 			log.Printf(
