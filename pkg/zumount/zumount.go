@@ -53,9 +53,16 @@ func UnmountAll(dataset string) error {
 		return err
 	}
 	var lastMountsRemain int
+	var try int
 	// while mounts remain, try to unmount some more
 	for len(mountsRemain) > 0 {
+		try++
+		if try > 10 {
+			return fmt.Errorf("giving up after 10 iterations")
+		}
+		log.Printf("> unmounting %s from %d mount namespaces (try %d)...", dataset, len(mountsRemain))
 		for _, ns := range mountsRemain {
+			log.Printf(">> unmounting %s from ns %d", dataset, ns)
 			err = UnmountDatasetInNamespace(dataset, ns)
 			if err != nil {
 				log.Printf("failed unmounting %s in %s, but maybe made some progress, continuing... err: %s", dataset, ns, err)
@@ -70,7 +77,7 @@ func UnmountAll(dataset string) error {
 			return fmt.Errorf("made no progress, aborting")
 		}
 		if len(mountsRemain) == 0 {
-			break
+			return nil
 		}
 	}
 	return nil
