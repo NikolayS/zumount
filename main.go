@@ -19,7 +19,7 @@ func main() {
 	}
 	err := zumount.Clean(os.Args[1])
 	if err != nil {
-		log.Printf("error cleaning: %s")
+		log.Printf("error cleaning: %s", err)
 		os.Exit(1)
 	}
 
