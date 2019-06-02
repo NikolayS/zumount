@@ -62,7 +62,7 @@ func UnmountAll(dataset string) error {
 		}
 		log.Printf("> unmounting %s from %d mount namespaces (try %d)...", dataset, len(mountsRemain), try)
 		for _, ns := range mountsRemain {
-			log.Printf(">> unmounting %s from ns %d", dataset, ns)
+			log.Printf(">> unmounting %s from ns %s", dataset, ns)
 			err = UnmountDatasetInNamespace(dataset, ns)
 			if err != nil {
 				log.Printf("failed unmounting %s in %s, but maybe made some progress, continuing... err: %s", dataset, ns, err)
