@@ -88,7 +88,6 @@ func UnmountAll(dataset string) error {
 }
 
 func NamespacesForDataset(dataset string) ([]string, error) {
-
 	mountTables, err := filepath.Glob("/proc/*/mounts")
 	if err != nil {
 		return nil, err
@@ -101,11 +100,6 @@ func NamespacesForDataset(dataset string) ([]string, error) {
 		mounts, err := ioutil.ReadFile(mountTable)
 		if err != nil {
 			// pids can disappear between globbing and reading
-			log.Printf(
-				"[mount:%s] ignoring error reading pid mount table %v: %v",
-				dataset,
-				mountTable, err,
-			)
 			continue
 		}
 		for _, line := range strings.Split(string(mounts), "\n") {
