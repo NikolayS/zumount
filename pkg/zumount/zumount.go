@@ -48,54 +48,41 @@ func Clean(pool string) error {
 func UnmountAll(dataset string) error {
 	// dataset is a fully qualified zfs filesystem or snapshot name
 	// e.g. pool/foo/bar/baz@snap
-	mountsRemain, err := NamespacesForDataset(dataset)
+	nextNS, err := OneNamespaceForDataset(dataset)
 	if err != nil {
 		return err
 	}
-	var lastMountsRemain int
-	var try int
+	var lastNS string
 	// while mounts remain, try to unmount some more
-	for len(mountsRemain) > 0 {
-		try++
-		if try > 10 {
-			return fmt.Errorf("giving up after 10 iterations")
+	for nextNS != "" {
+		log.Printf("> unmounting %s from %s mount ns...", dataset, nextNS)
+		err = UnmountDatasetInNamespace(dataset, nextNS)
+		if err != nil {
+			log.Printf(
+				"failed unmounting %s in %s, but maybe made some progress, continuing... err: %s",
+				dataset, nextNS, err,
+			)
 		}
-		log.Printf("> unmounting %s from %d mount namespaces (try %d)...", dataset, len(mountsRemain), try)
-		for _, ns := range mountsRemain {
-			log.Printf(">> unmounting %s from ns %s", dataset, ns)
-			err = UnmountDatasetInNamespace(dataset, ns)
-			if err != nil {
-				log.Printf("failed unmounting %s in %s, but maybe made some progress, continuing... err: %s", dataset, ns, err)
-			} else {
-				// unmount succeeded, so we made progress, avoid
-				// trying to unmount it 7999 more times...
-				break
-			}
-		}
-		lastMountsRemain = len(mountsRemain)
-		mountsRemain, err = NamespacesForDataset(dataset)
+		lastNS = nextNS
+		nextNS, err = OneNamespaceForDataset(dataset)
 		if err != nil {
 			return err
 		}
-		if lastMountsRemain == len(mountsRemain) {
-			return fmt.Errorf("made no progress, aborting")
-		}
-		if len(mountsRemain) == 0 {
-			return nil
+		if lastNS == nextNS {
+			return fmt.Errorf("made no progress (ns %s got stuck), aborting", lastNS)
 		}
 	}
 	return nil
 }
 
-func NamespacesForDataset(dataset string) ([]string, error) {
+func OneNamespaceForDataset(dataset string) (string, error) {
 	mountTables, err := filepath.Glob("/proc/*/mounts")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if mountTables == nil {
-		return nil, fmt.Errorf("no mount tables in /proc/*/mounts")
+		return "", fmt.Errorf("no mount tables in /proc/*/mounts")
 	}
-	pids := []string{}
 	for _, mountTable := range mountTables {
 		mounts, err := ioutil.ReadFile(mountTable)
 		if err != nil {
@@ -106,11 +93,11 @@ func NamespacesForDataset(dataset string) ([]string, error) {
 			if strings.Contains(line, dataset) {
 				shrapnel := strings.Split(mountTable, "/")
 				// e.g. (0)/(1)proc/(2)X/(3)mounts
-				pids = append(pids, shrapnel[2])
+				return shrapnel[2], nil
 			}
 		}
 	}
-	return pids, nil
+	return "", nil
 }
 
 func UnmountDatasetInNamespace(dataset, ns string) error {
