@@ -58,20 +58,19 @@ func UnmountAll(dataset string) error {
 		for _, ns := range mountsRemain {
 			err = UnmountDatasetInNamespace(dataset, ns)
 			if err != nil {
-				log.Printf("failed unmounting %s in %s, but maybe made some progress, xontinuing... err: %s", dataset, ns, err)
+				log.Printf("failed unmounting %s in %s, but maybe made some progress, continuing... err: %s", dataset, ns, err)
 			}
-			lastMountsRemain = len(mountsRemain)
-			// XXX does updating mountsRemain while iterating over it make sense?
-			mountsRemain, err = NamespacesForDataset(dataset)
-			if err != nil {
-				return err
-			}
-			if lastMountsRemain == len(mountsRemain) {
-				return fmt.Errorf("made no progress, aborting")
-			}
-			if len(mountsRemain) == 0 {
-				break
-			}
+		}
+		lastMountsRemain = len(mountsRemain)
+		mountsRemain, err = NamespacesForDataset(dataset)
+		if err != nil {
+			return err
+		}
+		if lastMountsRemain == len(mountsRemain) {
+			return fmt.Errorf("made no progress, aborting")
+		}
+		if len(mountsRemain) == 0 {
+			break
 		}
 	}
 	return nil
