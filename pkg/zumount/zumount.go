@@ -48,7 +48,7 @@ func Clean(pool string) error {
 func UnmountAll(dataset string) error {
 	// dataset is a fully qualified zfs filesystem or snapshot name
 	// e.g. pool/foo/bar/baz@snap
-	nextNS, err := OneNamespaceForDataset(dataset)
+	nextNS, mountpoint, err := OneNamespaceForDataset(dataset)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func UnmountAll(dataset string) error {
 	// while mounts remain, try to unmount some more
 	for nextNS != "" {
 		log.Printf("> unmounting %s from mount ns %s...", dataset, nextNS)
-		err = UnmountDatasetInNamespace(dataset, nextNS)
+		err = UnmountDatasetInNamespace(nextNS, mountpoint)
 		if err != nil {
 			log.Printf(
 				"failed unmounting %s in %s, but maybe made some progress, continuing... err: %s",
@@ -64,7 +64,7 @@ func UnmountAll(dataset string) error {
 			)
 		}
 		lastNS = nextNS
-		nextNS, err = OneNamespaceForDataset(dataset)
+		nextNS, mountpoint, err = OneNamespaceForDataset(dataset)
 		if err != nil {
 			return err
 		}
@@ -75,13 +75,13 @@ func UnmountAll(dataset string) error {
 	return nil
 }
 
-func OneNamespaceForDataset(dataset string) (string, error) {
+func OneNamespaceForDataset(dataset string) (string, string, error) {
 	mountTables, err := filepath.Glob("/proc/*/mounts")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if mountTables == nil {
-		return "", fmt.Errorf("no mount tables in /proc/*/mounts")
+		return "", "", fmt.Errorf("no mount tables in /proc/*/mounts")
 	}
 	for _, mountTable := range mountTables {
 		mounts, err := ioutil.ReadFile(mountTable)
@@ -93,20 +93,24 @@ func OneNamespaceForDataset(dataset string) (string, error) {
 			if strings.Contains(line, dataset) {
 				shrapnel := strings.Split(mountTable, "/")
 				// e.g. (0)/(1)proc/(2)X/(3)mounts
-				return shrapnel[2], nil
+				pid := shrapnel[2]
+				lineShrapnel := strings.Split(line, " ")
+				// e.g. 2a2c2a84-d91a-432c-bd4f-ac981e24f86a /var/lib/dotmesh/mnt/dmfs/83ec674c-8e5f-42cf-8527-97331bbf6163@2a2c2a84-d91a-432c-bd4f-ac981e24f86a zfs ro,noatime,xattr,noacl 0 0
+				mountpoint := lineShrapnel[1]
+				return pid, mountpoint, nil
 			}
 		}
 	}
-	return "", nil
+	return "", "", nil
 }
 
-func UnmountDatasetInNamespace(dataset, ns string) error {
+func UnmountDatasetInNamespace(ns, mountpoint string) error {
 	out, err := exec.Command(
 		"nsenter", "-t", ns, "-a",
-		"umount", "--all-targets", dataset,
+		"umount", mountpoint,
 	).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed nsenter umount of %s in ns %s, err: %s, out: %s", dataset, ns, err, out)
+		return fmt.Errorf("failed nsenter umount of %s in ns %s, err: %s, out: %s", mountpoint, ns, err, out)
 	}
 	return nil
 }
