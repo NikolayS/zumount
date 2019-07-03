@@ -37,7 +37,7 @@ func Clean(pool string) error {
 		return err
 	}
 	for _, dataset := range ds {
-		err := UnmountAll(dataset)
+		err := UnmountAll(dataset, 0)
 		if err != nil {
 			return err
 		}
@@ -45,43 +45,54 @@ func Clean(pool string) error {
 	return nil
 }
 
-func UnmountAll(dataset string) error {
+func UnmountAll(dataset string, try int) error {
 	// dataset is a fully qualified zfs filesystem or snapshot name
 	// e.g. pool/foo/bar/baz@snap
-	nextNS, mountpoint, err := OneNamespaceForDataset(dataset)
+	namespacesMountpoints, err := AllNamespacesForDataset(dataset)
 	if err != nil {
 		return err
 	}
-	var lastNS string
-	// while mounts remain, try to unmount some more
-	for nextNS != "" {
-		log.Printf("> unmounting %s from mount ns %s...", dataset, nextNS)
-		err = UnmountDatasetInNamespace(nextNS, mountpoint)
-		if err != nil {
+
+	for namespace, mountpoints := range namespacesMountpoints {
+		for _, mountpoint := range mountpoints {
 			log.Printf(
-				"failed unmounting %s in %s, but maybe made some progress, continuing... err: %s",
-				dataset, nextNS, err,
+				"> unmounting %s from mount ns %s (mounted at %s)...",
+				dataset, namespace, mountpoint,
 			)
+			err = UnmountDatasetInNamespace(namespace, mountpoint)
+			if err != nil {
+				log.Printf(
+					"failed unmounting %s in %s at %s, but maybe made some progress, continuing... err: %s",
+					dataset, namespace, mountpoint, err,
+				)
+			}
 		}
-		lastNS = nextNS
-		nextNS, mountpoint, err = OneNamespaceForDataset(dataset)
-		if err != nil {
-			return err
-		}
-		if lastNS == nextNS {
-			return fmt.Errorf("made no progress (ns %s got stuck), aborting", lastNS)
+	}
+	// Check whether we succeeded - there should be no mounts anywhere now.
+	mountsLeft, err := AllNamespacesForDataset(dataset)
+	if err != nil {
+		return err
+	}
+	if len(mountsLeft) > 0 {
+		if try > 5 {
+			return fmt.Errorf("Found %d mounts remaining after trying to remove them all, %d times, giving up!", len(mountsLeft), try)
+		} else {
+			log.Printf("Found %d mounts remaining, trying again (current try %d)", len(mountsLeft), try)
+			return UnmountAll(dataset, try+1)
 		}
 	}
 	return nil
 }
 
-func OneNamespaceForDataset(dataset string) (string, string, error) {
+// Return a list of mountpoints for the given dataset in all namespaces
+func AllNamespacesForDataset(dataset string) (map[string][]string, error) {
+	ret := map[string][]string{}
 	mountTables, err := filepath.Glob("/proc/*/mounts")
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if mountTables == nil {
-		return "", "", fmt.Errorf("no mount tables in /proc/*/mounts")
+		return nil, fmt.Errorf("no mount tables in /proc/*/mounts")
 	}
 	for _, mountTable := range mountTables {
 		mounts, err := ioutil.ReadFile(mountTable)
@@ -97,11 +108,15 @@ func OneNamespaceForDataset(dataset string) (string, string, error) {
 				lineShrapnel := strings.Split(line, " ")
 				// e.g. 2a2c2a84-d91a-432c-bd4f-ac981e24f86a /var/lib/dotmesh/mnt/dmfs/83ec674c-8e5f-42cf-8527-97331bbf6163@2a2c2a84-d91a-432c-bd4f-ac981e24f86a zfs ro,noatime,xattr,noacl 0 0
 				mountpoint := lineShrapnel[1]
-				return pid, mountpoint, nil
+				_, ok := ret[pid]
+				if !ok {
+					ret[pid] = []string{}
+				}
+				ret[pid] = append(ret[pid], mountpoint)
 			}
 		}
 	}
-	return "", "", nil
+	return ret, nil
 }
 
 func UnmountDatasetInNamespace(ns, mountpoint string) error {
