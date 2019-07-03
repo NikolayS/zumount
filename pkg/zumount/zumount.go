@@ -115,6 +115,9 @@ func AllNamespacesForDataset(dataset string) (map[string][]string, error) {
 				shrapnel := strings.Split(mountTable, "/")
 				// e.g. (0)/(1)proc/(2)X/(3)mounts
 				pid := shrapnel[2]
+				if pid == "self" || pid == "thread-self" {
+					continue
+				}
 				lineShrapnel := strings.Split(line, " ")
 				// e.g. 2a2c2a84-d91a-432c-bd4f-ac981e24f86a /var/lib/dotmesh/mnt/dmfs/83ec674c-8e5f-42cf-8527-97331bbf6163@2a2c2a84-d91a-432c-bd4f-ac981e24f86a zfs ro,noatime,xattr,noacl 0 0
 				mountpoint := lineShrapnel[1]
