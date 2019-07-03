@@ -60,10 +60,6 @@ func UnmountAll(dataset string, try int) error {
 
 	for namespace, mountpoints := range namespacesMountpoints {
 		for _, mountpoint := range mountpoints {
-			log.Printf(
-				"> unmounting %s from mount ns %s (mounted at %s)...",
-				dataset, namespace, mountpoint,
-			)
 			err = UnmountDatasetInNamespace(namespace, mountpoint)
 			if err != nil {
 				if strings.Contains(err.Error(), "not mounted") {
@@ -74,6 +70,11 @@ func UnmountAll(dataset string, try int) error {
 						dataset, namespace, mountpoint, err,
 					)
 				}
+			} else {
+				log.Printf(
+					"> unmounted %s from mount ns %s (mounted at %s) successfully",
+					dataset, namespace, mountpoint,
+				)
 			}
 		}
 	}
@@ -130,8 +131,7 @@ func AllNamespacesForDataset(dataset string) (map[string][]string, error) {
 
 func UnmountDatasetInNamespace(ns, mountpoint string) error {
 	out, err := exec.Command(
-		"nsenter", "-t", ns, "-a",
-		"umount", mountpoint,
+		"nsenter", "-t", ns, "-a", "umount", mountpoint,
 	).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed nsenter umount of %s in ns %s, err: %s, out: %s", mountpoint, ns, err, out)

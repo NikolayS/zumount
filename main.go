@@ -12,7 +12,7 @@ import (
 // 2. unmount all of the filesystems and snapshots for that zfs pool from all mount namespaces on the system
 
 func main() {
-	log.Print("Hello, zumount v1.8 starting")
+	log.Print("Hello, zumount v1.9 starting")
 	if len(os.Args) != 2 {
 		log.Printf("specify pool to unmount")
 		os.Exit(1)
