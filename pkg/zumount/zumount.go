@@ -14,6 +14,11 @@ func AllDatasetsLeafFirst(pool string) ([]string, error) {
 		"zfs", "list", "-o", "name", "-r", "-H", "-t", "snapshot,filesystem", pool,
 	).CombinedOutput()
 	if err != nil {
+		if strings.Contains(err, "dataset does not exist") {
+			// this is kindof a success, just say there are no such datasets
+			// and we will succeed
+			return []string{}, nil
+		}
 		return nil, fmt.Errorf("list gave %s, out: %s", err, out)
 	}
 	reversed := []string{}
@@ -61,10 +66,14 @@ func UnmountAll(dataset string, try int) error {
 			)
 			err = UnmountDatasetInNamespace(namespace, mountpoint)
 			if err != nil {
-				log.Printf(
-					"failed unmounting %s in %s at %s, but maybe made some progress, continuing... err: %s",
-					dataset, namespace, mountpoint, err,
-				)
+				if strings.Contains(err.Error(), "not mounted") {
+					// this happens a lot and is ok, don't log it
+				} else {
+					log.Printf(
+						"failed unmounting %s in %s at %s, but maybe made some progress, continuing... err: %s",
+						dataset, namespace, mountpoint, err,
+					)
+				}
 			}
 		}
 	}
