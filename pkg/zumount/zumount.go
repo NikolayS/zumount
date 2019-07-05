@@ -14,7 +14,7 @@ func AllDatasetsLeafFirst(pool string) ([]string, error) {
 		"zfs", "list", "-o", "name", "-r", "-H", "-t", "snapshot,filesystem", pool,
 	).CombinedOutput()
 	if err != nil {
-		if strings.Contains(out, "dataset does not exist") {
+		if strings.Contains(string(out), "dataset does not exist") {
 			// this is kindof a success, just say there are no such datasets
 			// and we will succeed
 			return []string{}, nil
